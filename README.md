@@ -55,3 +55,47 @@ A few special arguments can be added to OSC messages to affect gradio_client its
 ### Receiving results
 
 By default replies will be sent back to the same address that sent the message. It is possible to change this behavior by sending "osc-reply_host" and "osc-reply_port" along with any OSC message (see above). Just in case you're using MaxMSP and you need to recv on a different address than the one you send from.
+
+## SuperCollider example
+
+Reference example for stable-audio:
+
+```console
+hatch shell
+python -m gradio_osc -p 10508 https://url.to.gradio.live
+```
+
+```supercollider
+(
+// osc responder triggered when a sample is ready
+OSCdef(\generateDone, { |msg|
+	var path = msg[1];
+	"Generated: %".format(path).postln;
+	// do something with this fresh fresh ai music
+	s.waitForBoot {Buffer.read(s, path, action: {|b| b.play })}
+}, "/generate.reply")
+)
+
+(
+// uncond with prompt and negative
+NetAddr("localhost", 10518).sendMsg("/generate", 
+	"prompt", "hey I'm just developing some osc integration",
+	"negative_prompt", "field recordings, programming",
+	"seconds_total", 1,
+	"steps", 100,
+	"osc-download_path", Platform.userHomeDir +/+ "stable-audio/"
+)
+)
+
+(
+// generate from init_audio (upload is handled automagically by gradio-osc and gradio-client
+NetAddr("localhost", 10518).sendMsg("/generate", 
+	"prompt", "hey I'm just re-digesting some osc integration",
+	"use_init", "true",
+	"init_audio", "/home/giano/stable-audio/d52c4820d22e0d81edd9f55c0c1cdf3fbcd418eb/output.wav",
+	"init_noise_level", 0.3
+	"negative_prompt", "field recordings, programming",
+	"osc-download_path", Platform.userHomeDir +/+ "stable-audio/"
+)
+)
+```
