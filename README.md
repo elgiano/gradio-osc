@@ -108,3 +108,48 @@ NetAddr("localhost", 10518).sendMsg("/generate",
 )
 )
 ```
+
+## TidalCycles example (WIP)
+
+```sh
+python -m gradio_osc -p 10508 -d "/path/to/superdirt/sample/library" "https://url.to.gradio.live"
+```
+
+`startup.scd`:
+```scd
+OSCdef(\gradio, { arg msg;
+    ~dirt.loadSoundFiles(msg[1].asString.dirname);
+}, '/generate.reply');
+```
+
+`Boot.hs`:
+```hs
+:set -package hosc
+import Sound.Osc.Fd
+```
+
+`.tidal`:
+```hs
+r <- openUdp  "127.0.0.1" 10508
+
+gr s p = sendMessage r $ Message "/generate" [
+  string "prompt", string p,
+  string "osc-download_dirname", string s, 
+  string "osc-reply_port", Int32 57120]
+
+gr "boom" "happy little frog"
+
+-- with negative prompting
+grn s p n = sendMessage r $ Message "/generate" [
+  string "prompt", string p,
+  string "osc-download_dirname", string s, 
+  string "osc-reply_port", Int32 57120,
+  string "negative_prompt", string n]
+
+grn "boom" "celebrating a frog getting married" "frog, field recording"
+
+-- wait for `~dirt.loadSoundFiles` to confirm
+
+d1 $ s "boom" # legato 1
+```
+
