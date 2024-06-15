@@ -72,18 +72,19 @@ class GradioOSCServer(BlockingOSCUDPServer):
 
         # process special args
         if 'osc-reply_host' in gradio_args:
-            replyAddr[0] = gradio_args['osc-reply_host']
+            replyAddr = (gradio_args['osc-reply_host'], replyAddr[1])
             del gradio_args['osc-reply_host']
         if 'osc-reply_port' in gradio_args:
-            replyAddr[1] = gradio_args['osc-reply_port']
+            replyAddr = (replyAddr[0], gradio_args['osc-reply_port'])
             del gradio_args['osc-reply_port']
 
         filter_args = self.filter_inputs(path, gradio_args)
-        print(gradio_args)
+        # print(gradio_args)
 
         self.gradio_client.submit(api_name=path, result_callbacks=[
             lambda *results: self.reply_results(replyAddr, path, filter_args, results)
         ], **gradio_args)
+        print("> New job submitted to gradio app")
 
         # self.progress_monitor.add_job(job)
         # self.reply_status(replyAddr, job)
@@ -113,6 +114,7 @@ class GradioOSCServer(BlockingOSCUDPServer):
                 print(e)
 
         osc_args = self.results_to_osc_args(results)
+        print(f"< Job done! sending reply to {addr}")
         SimpleUDPClient(addr[0], addr[1]).send_message(path + ".reply", osc_args)
 
     def results_to_osc_args(self, returns):
