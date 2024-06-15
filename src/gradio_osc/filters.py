@@ -25,10 +25,10 @@ class GradioOSCFilter(ABC):
                 del gradio_args[k]
         return extracted
 
-    def process_inputs(self, path: str, gradio_args: dict, server) -> dict:
+    def process_inputs(self, path: str, gradio_args: dict) -> dict:
         return self.extract_inputs(gradio_args)
 
-    def process_outputs(self, addr, path, special_args, results, server):
+    def process_outputs(self, addr, path, special_args, results):
         pass
 
 
@@ -42,8 +42,8 @@ class FormatUploads(GradioOSCFilter):
     This filter makes gradio happy to upload files provided as string paths.
     '''
 
-    def process_inputs(self, path: str, gradio_args: dict, server) -> dict:
-        types = server.get_param_types(path)
+    def process_inputs(self, path: str, gradio_args: dict) -> dict:
+        types = self.server.get_params_types(path)
         for k, v in gradio_args.items():
             if k in types and types[k] == "filepath":
                 gradio_args[k] = { 
@@ -66,36 +66,39 @@ class MoveDownloads(GradioOSCFilter):
     '''
     extra_args = ['osc-download_path']
 
-    def process_inputs(self, path: str, gradio_args: dict, server):
+    def process_inputs(self, path: str, gradio_args: dict):
         return super().extract_inputs(gradio_args)
 
-    def process_outputs(self, addr, path, special_args, results, server):
+    def process_outputs(self, addr, path, special_args, results):
         if 'osc-download_path' not in special_args:
             return
-        gradio_dl_path = server.gradio_client.download_files
         dst = special_args['osc-download_path']
+        gradio_dl_path = self.server.gradio_client.download_files
 
         # check path, create only if parent already exists
-        if not os.path.isdir(dst):
-            if os.path.exists(Path(dst).parent):
-                try:
-                    os.makedirs(dst)
-                except Exception as e:
-                    pass
-            if not os.path.isdir(dst):
-                print(f"[MoveDownloads] Error: destination path '{dst}' doesn't exist")
-                return
+        if not self.check_dstpath(dst,
+                                  make=os.path.exists(Path(dst).parent)):
+            print(f"[MoveDownloads] Error: destination path '{dst}' doesn't exist")
+            return
 
-        specs = server.get_results_spec(path)
+        types = self.server.get_results_types(path)
         for i, r in enumerate(results):
-            spec = specs[i]
-            if spec['python_type']['type'] == 'filepath':
-                new_path = self.get_destination(r, dst, gradio_dl_path)
+            if types[i] == 'filepath':
+                new_path = self.get_dstpath(r, dst, gradio_dl_path)
                 print(f"[MoveDownloads] moving {r}\n  -> {new_path}")
                 move(r, new_path)
+                # replace path in results
                 results[i] = new_path
 
-    def get_destination(self, orig, dst, orig_root):
+    def check_dstpath(self, dst, make=False):
+        if not os.path.isdir(dst) and make:
+            try:
+                os.makedirs(dst)
+            except Exception as e:
+                print(e)
+        return os.path.isdir(dst)
+
+    def get_dstpath(self, orig, dst, orig_root):
         if os.path.commonpath([orig, orig_root]) == orig_root:
             # if orig is in a subdir of gradio_download_path
             # recreate eventual gradio_download_path subdir
@@ -104,5 +107,3 @@ class MoveDownloads(GradioOSCFilter):
             return path
         else:
             return os.path.join(dst, os.path.basename(orig))
-
-
