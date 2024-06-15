@@ -2,6 +2,7 @@ from abc import ABC
 import os
 from pathlib import Path
 from shutil import move
+from datetime import datetime
 
 
 class GradioOSCFilter(ABC):
@@ -107,3 +108,46 @@ class MoveDownloads(GradioOSCFilter):
             return path
         else:
             return os.path.join(dst, os.path.basename(orig))
+
+
+class RenameFiles(MoveDownloads):
+    '''
+    Moves download files to 'osc-download_dirname', relative to GRADIO_DOWNLOAD_FILES
+    and renames them as timestamp YYMMDD_HHMMSS.ext
+    '''
+    extra_args = ['osc-download_dirname']
+
+    def process_inputs(self, path: str, gradio_args: dict):
+        special_args = super().extract_inputs(gradio_args)
+        # save prompt for later
+        return special_args
+
+    def process_outputs(self, addr, path, special_args, results):
+        if 'osc-download_dirname' not in special_args:
+            return
+        dst = special_args['osc-download_dirname']
+        gradio_dl_path = self.server.gradio_client.download_files
+
+        dst = os.path.join(gradio_dl_path, dst)
+
+        # check path, create only if parent already exists
+        if not self.check_dstpath(dst,
+                                  make=os.path.exists(Path(dst).parent)):
+            print(f"[MoveDownloads] Error: destination path '{dst}' doesn't exist")
+            return
+
+        types = self.server.get_results_types(path)
+        for i, r in enumerate(results):
+            if types[i] == 'filepath':
+                new_path = self.get_dstpath(r, dst, gradio_dl_path)
+                print(f"[MoveDownloads] moving {r}\n  -> {new_path}")
+                move(r, new_path)
+                # replace path in results
+                results[i] = new_path
+
+    def get_dstpath(self, orig, dst, orig_root):
+        ext = os.path.splitext(orig)[1]
+        return os.path.join(dst, self.get_timestamp()+ext)
+
+    def get_timestamp(self):
+        return datetime.now().strftime('%Y%m%d_%H%M%S')

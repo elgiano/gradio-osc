@@ -4,17 +4,17 @@ from pythonosc.udp_client import SimpleUDPClient
 from typing import Tuple
 
 from .utils import print_gradio_api
-from .filters import FormatUploads, MoveDownloads
+from .filters import FormatUploads
 
 
 class GradioOSCServer(BlockingOSCUDPServer):
 
-    def __init__(self, port, host="localhost"):
+    def __init__(self, port, host="localhost", filters=[]):
         super().__init__((host, port), Dispatcher())
         self.dispatcher.set_default_handler(self.osc_handler,
                                             needs_reply_address=True)
 
-        self.filters = [FormatUploads(), MoveDownloads()]
+        self.filters = [FormatUploads()] + filters
         for f in self.filters:
             f.server = self
         # self.progress_monitor = ProgressMonitor()
@@ -93,7 +93,7 @@ class GradioOSCServer(BlockingOSCUDPServer):
         for filter in self.filters:
             args = None
             try:
-                args = filter.process_inputs(path, gradio_args, self)
+                args = filter.process_inputs(path, gradio_args)
             except Exception as e:
                 print("Error filtering inputs:")
                 print(e)
@@ -107,7 +107,7 @@ class GradioOSCServer(BlockingOSCUDPServer):
         results = list(results)
         for (filter, f_args) in zip(self.filters, filter_args):
             try:
-                filter.process_outputs(addr, path, f_args, results, self)
+                filter.process_outputs(addr, path, f_args, results)
             except Exception as e:
                 print("Error filtering results:")
                 print(e)

@@ -2,6 +2,8 @@ from .server import GradioOSCServer
 from threading import Thread
 from time import sleep
 import argparse
+from .filters import RenameFiles
+
 
 class OSCServerThread(Thread):
     def __init__(self, server: GradioOSCServer):
@@ -20,6 +22,8 @@ def parse_args():
     parser = argparse.ArgumentParser()
     parser.add_argument('-p', '--osc_port', type=int, default=10518,
                         help="osc server port")
+    parser.add_argument('-d', '--gradio_dl', type=str, default=None,
+                        help="gradio download folder")
     parser.add_argument('gradio_url', type=str,
                         help="gradio app url")
     return parser.parse_args()
@@ -30,8 +34,11 @@ def main():
 
     print("*>* Hold on while we connect to your gradio app...")
 
-    osc = GradioOSCServer(args.osc_port)
+    osc = GradioOSCServer(args.osc_port,
+                          filters=[RenameFiles()])
     osc.connect_gradio(args.gradio_url)
+    if args.gradio_dl is not None:
+        osc.gradio_client.download_files = args.gradio_dl
 
     thread = OSCServerThread(osc)
     thread.start()
