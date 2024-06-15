@@ -45,16 +45,25 @@ gradio_client.predict(api_name="/generate",
 )
 ```
 
+
 ### special arguments:
 A few special arguments can be added to OSC messages to affect gradio_client itself. They won't be forwarded to the gradio app.
 
-- `"osc-download_path"`: specifies the path where to eventually download files
 - `"osc-reply_host"`: specifies an alternative hostname to send replies (results) to.
 - `"osc-reply_port"`: specifies an alternative port to send replies (results) to.
 
 ### Receiving results
 
 By default replies will be sent back to the same address that sent the message. It is possible to change this behavior by sending "osc-reply_host" and "osc-reply_port" along with any OSC message (see above). Just in case you're using MaxMSP and you need to recv on a different address than the one you send from.
+
+#### downloaded files
+
+By default gradio-client downloads files to a temporary folder (e.g. /tmp/gradio). Alternative download folder can be specified with the `-d` option:
+
+```console
+gradio-osc -p 10518 -d ~/Music/generated "https://url.to.gradio.live"
+```
+
 
 ## SuperCollider example
 
