@@ -22,3 +22,4 @@ def print_gradio_api(api_dict: dict):
             python_type = p['python_type']['type']
             # param_default = p['default']
             print(f"  -> {label}: {python_type}")
+

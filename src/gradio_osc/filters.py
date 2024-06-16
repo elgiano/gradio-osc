@@ -56,36 +56,29 @@ class FormatUploads(GradioOSCFilter):
 
 class MoveDownloads(GradioOSCFilter):
     '''
-    Automatically move all downloaded files to osc-definable 'osc-download_path'.
-    If the original download path is a subdirectory of gradio-client's default
-    download folder (gradio_client.download_files), recreates subdirectories.
-    e.g.
-    osc-download_path: /home/foo/
-    gradio's default: /tmp/gradio
-    original download path: /tmp/gradio/1234567890/image.webp
-    -> destination: /home/foo/123567890/image.webp
+    Moves downloaded files to a named subdirectory,
+    relative to the default download path used by gradio-client,
+    and renames them as timestamp YYMMDD_HHMMSS.ext
     '''
-    extra_args = ['osc-download_path']
+    extra_args = ['osc-download_dirname']
 
     def process_inputs(self, path: str, gradio_args: dict):
         return super().extract_inputs(gradio_args)
 
-    def process_outputs(self, addr, path, special_args, results):
-        if 'osc-download_path' not in special_args:
+    def process_outputs(self, replyAddr, path, special_args, results):
+        if 'osc-download_dirname' not in special_args:
             return
-        dst = special_args['osc-download_path']
         gradio_dl_path = self.server.gradio_client.download_files
+        dst = os.path.join(gradio_dl_path, special_args['osc-download_dirname'])
 
-        # check path, create only if parent already exists
-        if not self.check_dstpath(dst,
-                                  make=os.path.exists(Path(dst).parent)):
+        if not self.check_dstpath(dst, make=True):
             print(f"[MoveDownloads] Error: destination path '{dst}' doesn't exist")
             return
 
         types = self.server.get_results_types(path)
         for i, r in enumerate(results):
             if types[i] == 'filepath':
-                new_path = self.get_dstpath(r, dst, gradio_dl_path)
+                new_path = self.get_dstpath(r, dst)
                 print(f"[MoveDownloads] moving {r}\n  -> {new_path}")
                 move(r, new_path)
                 # replace path in results
@@ -94,60 +87,23 @@ class MoveDownloads(GradioOSCFilter):
     def check_dstpath(self, dst, make=False):
         if not os.path.isdir(dst) and make:
             try:
+                print(f"[MoveDownloads] creating path {dst}")
                 os.makedirs(dst)
             except Exception as e:
                 print(e)
         return os.path.isdir(dst)
 
-    def get_dstpath(self, orig, dst, orig_root):
-        if os.path.commonpath([orig, orig_root]) == orig_root:
-            # if orig is in a subdir of gradio_download_path
-            # recreate eventual gradio_download_path subdir
-            path = os.path.join(dst, os.path.relpath(orig, orig_root))
-            os.makedirs(os.path.dirname(path), exist_ok=True)
-            return path
-        else:
-            return os.path.join(dst, os.path.basename(orig))
-
-
-class RenameFiles(MoveDownloads):
-    '''
-    Moves download files to 'osc-download_dirname', relative to GRADIO_DOWNLOAD_FILES
-    and renames them as timestamp YYMMDD_HHMMSS.ext
-    '''
-    extra_args = ['osc-download_dirname']
-
-    def process_inputs(self, path: str, gradio_args: dict):
-        special_args = super().extract_inputs(gradio_args)
-        # save prompt for later
-        return special_args
-
-    def process_outputs(self, addr, path, special_args, results):
-        if 'osc-download_dirname' not in special_args:
-            return
-        dst = special_args['osc-download_dirname']
-        gradio_dl_path = self.server.gradio_client.download_files
-
-        dst = os.path.join(gradio_dl_path, dst)
-
-        # check path, create only if parent already exists
-        if not self.check_dstpath(dst,
-                                  make=os.path.exists(Path(dst).parent)):
-            print(f"[MoveDownloads] Error: destination path '{dst}' doesn't exist")
-            return
-
-        types = self.server.get_results_types(path)
-        for i, r in enumerate(results):
-            if types[i] == 'filepath':
-                new_path = self.get_dstpath(r, dst, gradio_dl_path)
-                print(f"[MoveDownloads] moving {r}\n  -> {new_path}")
-                move(r, new_path)
-                # replace path in results
-                results[i] = new_path
-
-    def get_dstpath(self, orig, dst, orig_root):
+    def get_dstpath(self, orig, dst):
         ext = os.path.splitext(orig)[1]
         return os.path.join(dst, self.get_timestamp()+ext)
 
     def get_timestamp(self):
         return datetime.now().strftime('%Y%m%d_%H%M%S')
+
+
+class PrintDownloads(GradioOSCFilter):
+    def process_outputs(self, replyAddr, path, special_args, results):
+        types = self.server.get_results_types(path)
+        for t, r in zip(types, results):
+            print(f"📁 Downloaded {r}")
+

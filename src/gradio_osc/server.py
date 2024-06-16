@@ -3,8 +3,7 @@ from pythonosc.osc_server import BlockingOSCUDPServer, Dispatcher
 from pythonosc.udp_client import SimpleUDPClient
 from typing import Tuple
 
-from .utils import print_gradio_api
-from .filters import FormatUploads
+from .filters import FormatUploads, MoveDownloads, PrintDownloads
 
 
 class GradioOSCServer(BlockingOSCUDPServer):
@@ -13,17 +12,24 @@ class GradioOSCServer(BlockingOSCUDPServer):
         super().__init__((host, port), Dispatcher())
         self.dispatcher.set_default_handler(self.osc_handler,
                                             needs_reply_address=True)
-
-        self.filters = [FormatUploads()] + filters
+        self.filters = [
+            FormatUploads(),
+            MoveDownloads(),
+            PrintDownloads()
+        ] + filters
         for f in self.filters:
             f.server = self
         # self.progress_monitor = ProgressMonitor()
 
-    def connect_gradio(self, gradio_src, **gradio_kwargs):
+    def connect_gradio(self, gradio_src, download_dir=None, **gradio_kwargs):
+        # add download_dir to gradio_kwargs only if not None
+        # so to allow Client to set it's DEFAULT_TMP_DIR if download_dir=None
+        if download_dir is not None:
+            gradio_kwargs['download_files'] = download_dir
         self.gradio_client = Client(gradio_src, **gradio_kwargs)
         api_dict = self.gradio_client.view_api(return_format="dict")
         self.gradio_endpoints = api_dict["named_endpoints"]
-        print_gradio_api(api_dict)
+        # print_gradio_api(api_dict)
 
     def get_endpoint(self, path: str, print_error=True):
         if self.gradio_endpoints is None:
@@ -60,12 +66,10 @@ class GradioOSCServer(BlockingOSCUDPServer):
         return [s['python_type']['type'] for s in specs]
 
     def osc_handler(self, replyAddr: Tuple[str, int], path: str, *args):
-        print(">", path, args)
-        endpoint = self.get_endpoint(path)
-        if endpoint is None:
+        print(f"\n> New job received: {path}")
+        print(args)
+        if self.get_endpoint(path, print_error=True) is None:
             return
-
-        endpoint = self.gradio_endpoints[path]
 
         # turn args from ["key", "value", ...] to a kwargs dict
         gradio_args = dict(zip(args[0::2], args[1::2]))
@@ -84,7 +88,7 @@ class GradioOSCServer(BlockingOSCUDPServer):
         self.gradio_client.submit(api_name=path, result_callbacks=[
             lambda *results: self.reply_results(replyAddr, path, filter_args, results)
         ], **gradio_args)
-        print("> New job submitted to gradio app")
+        print("job submitted to gradio app...")
 
         # self.progress_monitor.add_job(job)
         # self.reply_status(replyAddr, job)
@@ -105,6 +109,7 @@ class GradioOSCServer(BlockingOSCUDPServer):
     def reply_results(self, addr: Tuple[str, int], path: str, filter_args: list, results):
         # convert from tuple to list, so that filters can alter results
         # (a tuple can't be modified)
+        print("\ngot results from gradio")
         results = list(results)
         for (filter, f_args) in zip(self.filters, filter_args):
             try:
@@ -114,7 +119,7 @@ class GradioOSCServer(BlockingOSCUDPServer):
                 print(e)
 
         osc_args = self.results_to_osc_args(results)
-        print(f"< Job done! sending reply to {addr}")
+        print(f"👍 Job Done! sending reply to {addr}")
         SimpleUDPClient(addr[0], addr[1]).send_message(path + ".reply", osc_args)
 
     def results_to_osc_args(self, returns):
