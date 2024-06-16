@@ -156,3 +156,6 @@ gen "boom" [prompt "celebrating a frog getting married", nprompt "frog, field re
 d1 $ s "boom" # legato 1
 ```
 
+## Python example
+
+For programmatic usage, and adding custom filters, see `examples/sample_slicer.py`
