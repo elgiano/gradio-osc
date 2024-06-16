@@ -125,31 +125,34 @@ OSCdef(\gradio, { arg msg;
 `Boot.hs`:
 ```hs
 :set -package hosc
-import Sound.Osc.Fd
+import qualified Sound.Osc.Fd as O
+import qualified Network.Socket as N
+
+let gradioOSC = O.openUdp "localhost" 10518
+let gradioOscSend path args = O.withTransport gradioOSC (\t -> O.sendMessage t $ O.Message path args)
+
+let opair k v = [O.string k, v]
+-- arguments
+let dir       x = opair "osc-download_dirname" (O.string x)
+let replyPort x = opair "osc-reply_port" (O.int32 x)
+let prompt    x = opair "prompt" (O.string x)
+let nprompt   x = opair "negative_prompt" (O.string x)
+-- TODO: make all the other args here
+
+-- messages
+let gradio path args = gradioOscSend path $ concat [replyPort 57120, concat args]
+
+let gen x args = gradio "/generate" [dir x, concat args]
 ```
 
 `.tidal`:
 ```hs
-r <- openUdp  "127.0.0.1" 10508
-
-gr s p = sendMessage r $ Message "/generate" [
-  string "prompt", string p,
-  string "osc-download_dirname", string s, 
-  string "osc-reply_port", Int32 57120]
-
-gr "boom" "happy little frog"
+gr "boom" [prompt "happy little frog"]
 
 -- with negative prompting
-grn s p n = sendMessage r $ Message "/generate" [
-  string "prompt", string p,
-  string "osc-download_dirname", string s, 
-  string "osc-reply_port", Int32 57120,
-  string "negative_prompt", string n]
-
-grn "boom" "celebrating a frog getting married" "frog, field recording"
+gen "boom" [prompt "celebrating a frog getting married", nprompt "frog, field recording"]
 
 -- wait for `~dirt.loadSoundFiles` to confirm
-
 d1 $ s "boom" # legato 1
 ```
 
