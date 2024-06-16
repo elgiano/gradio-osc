@@ -29,7 +29,7 @@ class GradioOSCFilter(ABC):
     def process_inputs(self, path: str, gradio_args: dict) -> dict:
         return self.extract_inputs(gradio_args)
 
-    def process_outputs(self, addr, path, special_args, results):
+    def process_outputs(self, path:str, special_args, results, replyAddr):
         pass
 
 
@@ -65,7 +65,7 @@ class MoveDownloads(GradioOSCFilter):
     def process_inputs(self, path: str, gradio_args: dict):
         return super().extract_inputs(gradio_args)
 
-    def process_outputs(self, replyAddr, path, special_args, results):
+    def process_outputs(self, path, special_args, results, replyAddr):
         if 'osc-download_dirname' not in special_args:
             return
         gradio_dl_path = self.server.gradio_client.download_files
@@ -102,7 +102,7 @@ class MoveDownloads(GradioOSCFilter):
 
 
 class PrintDownloads(GradioOSCFilter):
-    def process_outputs(self, replyAddr, path, special_args, results):
+    def process_outputs(self, path, special_args, results, replyAddr):
         types = self.server.get_results_types(path)
         for t, r in zip(types, results):
             print(f"📁 Downloaded {r}")

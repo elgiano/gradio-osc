@@ -106,21 +106,24 @@ class GradioOSCServer(BlockingOSCUDPServer):
                 filter_args.append(args)
         return filter_args
 
-    def reply_results(self, addr: Tuple[str, int], path: str, filter_args: list, results):
+    def reply_results(self, replyAddr: Tuple[str, int],
+                      path: str, filter_args: list, results):
         # convert from tuple to list, so that filters can alter results
         # (a tuple can't be modified)
         print("\ngot results from gradio")
         results = list(results)
         for (filter, f_args) in zip(self.filters, filter_args):
             try:
-                filter.process_outputs(addr, path, f_args, results)
+                filter.process_outputs(path, f_args, results, replyAddr)
             except Exception as e:
                 print("Error filtering results:")
                 print(e)
 
         osc_args = self.results_to_osc_args(results)
-        print(f"👍 Job Done! sending reply to {addr}")
-        SimpleUDPClient(addr[0], addr[1]).send_message(path + ".reply", osc_args)
+        print(f"👍 Job Done! sending reply to {replyAddr}")
+        SimpleUDPClient(replyAddr[0], replyAddr[1]).send_message(
+            path + ".reply",
+            osc_args)
 
     def results_to_osc_args(self, returns):
         '''
@@ -135,7 +138,6 @@ class GradioOSCServer(BlockingOSCUDPServer):
             else:
                 return obj
         return [convert(r) for r in returns]
-
 
     # def reply_status(self, addr: Tuple[str, int], job):
     #     job_id = self.jobs.get_id(job)
