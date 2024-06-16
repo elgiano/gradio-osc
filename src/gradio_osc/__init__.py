@@ -1,19 +1,6 @@
 from .server import GradioOSCServer
 from threading import Thread
-from time import sleep
 import argparse
-
-
-class OSCServerThread(Thread):
-    def __init__(self, server: GradioOSCServer):
-        super().__init__()
-        self.server = server
-
-    def run(self):
-        self.server.serve_forever()
-
-    def stop(self):
-        self.server.shutdown()
 
 
 def parse_args():
@@ -27,7 +14,6 @@ def parse_args():
     return parser.parse_args()
 
 
-
 def main():
     args = parse_args()
 
@@ -36,15 +22,17 @@ def main():
     osc = GradioOSCServer(args.osc_port)
     osc.connect_gradio(args.gradio_url, download_dir=args.gradio_dl)
 
-    thread = OSCServerThread(osc)
-    print(f'OSC listening to port {args.osc_port}')
-    thread.start()
-    try:
-        while True:
-            sleep(1)
-    except KeyboardInterrupt:
-        thread.stop()
-        thread.join()
-        print("\nExiting...Bye!")
-        exit(0)
-    thread.join()
+    print(f'*>* Connected! OSC listening to port {args.osc_port}')
+    osc.serve_forever()
+    # thread = OSCServerThread(osc)
+    # print(f'OSC listening to port {args.osc_port}')
+    # thread.start()
+    # try:
+    #     while True:
+    #         sleep(1)
+    # except KeyboardInterrupt:
+    #     thread.stop()
+    #     thread.join()
+    #     print("\nExiting...Bye!")
+    #     exit(0)
+    # thread.join()
