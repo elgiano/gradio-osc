@@ -15,7 +15,9 @@ authors = [
 ]
 dependencies = [
   'gradio-client',
-  'python-osc'
+  'python-osc',
+  'numpy<2.0',
+  'librosa', # for examples: sample_slicer
 ]
 
 [project.urls]
