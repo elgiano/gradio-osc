@@ -1,5 +1,4 @@
 from .server import GradioOSCServer
-from threading import Thread
 import argparse
 
 
@@ -24,15 +23,3 @@ def main():
 
     print(f'*>* Connected! OSC listening to port {args.osc_port}')
     osc.serve_forever()
-    # thread = OSCServerThread(osc)
-    # print(f'OSC listening to port {args.osc_port}')
-    # thread.start()
-    # try:
-    #     while True:
-    #         sleep(1)
-    # except KeyboardInterrupt:
-    #     thread.stop()
-    #     thread.join()
-    #     print("\nExiting...Bye!")
-    #     exit(0)
-    # thread.join()

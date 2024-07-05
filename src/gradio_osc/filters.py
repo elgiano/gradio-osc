@@ -1,6 +1,5 @@
 from abc import ABC
 import os
-from pathlib import Path
 from shutil import move
 from datetime import datetime
 
@@ -58,18 +57,31 @@ class MoveDownloads(GradioOSCFilter):
     '''
     Moves downloaded files to a named subdirectory,
     relative to the default download path used by gradio-client,
-    and renames them as timestamp YYMMDD_HHMMSS.ext
+    and renames them as formattable filename (default: YYMMDD_HHMMSS.ext)
+    osc-download_filename format:
+        - date format codes: see https://docs.python.org/3/library/datetime.html#strftime-and-strptime-format-codes
+        - %#: substituted with gradio hash
+        - %n: substituted with download file number
+        - %t: substituted with default timestamp YYMMDD_HHMMSS
     '''
-    extra_args = ['osc-download_dirname']
+    extra_args = ['osc-download_dirname', 'osc-download_filename']
+    default_format = '%Y%m%d_%H%M%S'
+
+    def __init__(self, verbose=False):
+        self.verbose = verbose
 
     def process_inputs(self, path: str, gradio_args: dict):
         return super().extract_inputs(gradio_args)
 
-    def process_outputs(self, path, special_args, results, replyAddr):
-        if 'osc-download_dirname' not in special_args:
+    def process_outputs(self, path, special_args: dict, results, replyAddr):
+        if all(arg not in special_args for arg in self.extra_args):
             return
+
+        dst_dirname = special_args.get('osc-download_dirname', '')
         gradio_dl_path = self.server.gradio_client.download_files
-        dst = os.path.join(gradio_dl_path, special_args['osc-download_dirname'])
+        dst = os.path.join(gradio_dl_path, dst_dirname)
+
+        filename_format = special_args.get('osc-download_filename', self.default_format)
 
         if not self.check_dstpath(dst, make=True):
             print(f"[MoveDownloads] Error: destination path '{dst}' doesn't exist")
@@ -78,8 +90,17 @@ class MoveDownloads(GradioOSCFilter):
         types = self.server.get_results_types(path)
         for i, r in enumerate(results):
             if types[i] == 'filepath':
-                new_path = self.get_dstpath(r, dst)
-                print(f"[MoveDownloads] moving {r}\n  -> {new_path}")
+                # format filename
+                hash = os.path.split(os.path.dirname(r))[-1]
+                ext = os.path.splitext(r)[1]
+                new_fname = filename_format.replace('%n', str(i))
+                new_fname = filename_format.replace('%#', hash)
+                new_fname = filename_format.replace('%t', '%Y%m%d_%H%M%S')
+                new_fname = datetime.now().strftime(new_fname)
+                new_path = os.path.join(dst, new_fname + ext)
+
+                if self.verbose:
+                    print(f"[MoveDownloads] moving {r}\n  -> {new_path}")
                 move(r, new_path)
                 # replace path in results
                 results[i] = new_path
@@ -92,13 +113,6 @@ class MoveDownloads(GradioOSCFilter):
             except Exception as e:
                 print(e)
         return os.path.isdir(dst)
-
-    def get_dstpath(self, orig, dst):
-        ext = os.path.splitext(orig)[1]
-        return os.path.join(dst, self.get_timestamp()+ext)
-
-    def get_timestamp(self):
-        return datetime.now().strftime('%Y%m%d_%H%M%S')
 
 
 class PrintDownloads(GradioOSCFilter):

@@ -64,6 +64,10 @@ By default gradio-client downloads files to a temporary folder (e.g. /tmp/gradio
 gradio-osc -p 10518 -d ~/Music/generated "https://url.to.gradio.live"
 ```
 
+Special OSC arguments can be used to further customize download paths and filenames:
+- `"osc-download_dirname"`: custom dirname, relative to gradio download path
+- `"osc-download_filename"`: custom filename, with optional datetime format codes (e.g. %Y%M%D_%H%M%S)
+
 
 ## SuperCollider example
 
